@@ -32,13 +32,13 @@ import {
 // ============================================================================
 
 const firebaseConfig = {
-  apiKey:            "REPLACE_WITH_YOUR_API_KEY",
-  authDomain:        "REPLACE_WITH_YOUR_AUTH_DOMAIN",
-  databaseURL:       "REPLACE_WITH_YOUR_DATABASE_URL",
-  projectId:         "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket:     "REPLACE_WITH_YOUR_STORAGE_BUCKET",
-  messagingSenderId: "REPLACE_WITH_YOUR_SENDER_ID",
-  appId:             "REPLACE_WITH_YOUR_APP_ID",
+  apiKey: "AIzaSyAxw0yndXFHXNM3Mc0-XFSf0LD5m7MFZ3M",
+  authDomain: "destiny-2-electric-boogaloo.firebaseapp.com",
+  databaseURL: "https://destiny-2-electric-boogaloo-default-rtdb.firebaseio.com/",
+  projectId: "destiny-2-electric-boogaloo",
+  storageBucket: "destiny-2-electric-boogaloo.firebasestorage.app",
+  messagingSenderId: "261878471576",
+  appId: "1:261878471576:web:8c80f1cfde75fa18b129ed"
 };
 
 // ============================================================================
