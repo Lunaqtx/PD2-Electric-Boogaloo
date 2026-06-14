@@ -13,7 +13,7 @@ import {
   getDatabase, ref as dbRef, set, onValue, remove, update
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js';
 import {
-  getAuth, signInAnonymously
+  getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js';
 
 
@@ -77,12 +77,13 @@ window.addEventListener('unhandledrejection', (e) => {
   showFatalError('Async error', e.reason?.stack || e.reason?.message || String(e.reason));
 });
 
-let firebaseApp, db, auth;
+let firebaseApp, db, auth, googleProvider;
 if (!IS_UNCONFIGURED) {
   try {
     firebaseApp = initializeApp(firebaseConfig);
     db = getDatabase(firebaseApp);
     auth = getAuth(firebaseApp);
+    googleProvider = new GoogleAuthProvider();
   } catch (e) {
     showFatalError('Firebase init failed', e.stack || e.message || String(e));
     throw e;
@@ -94,7 +95,7 @@ if (!IS_UNCONFIGURED) {
 //  Constants
 // ============================================================================
 
-const HOURS = [17, 18, 19, 20, 21, 22, 23, 24];
+const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -122,7 +123,34 @@ const RAIDS = [
 ];
 
 const FIRETEAM_SIZE = 6;
-const LS_KEY = 'pd2eb_my_guardian_id';
+
+
+// ============================================================================
+//  Auth helpers
+// ============================================================================
+
+async function signInWithGoogle() {
+  try {
+    await signInWithPopup(auth, googleProvider);
+  } catch (err) {
+    console.error('Google sign-in failed:', err);
+    // Common cause: popup blocked, or domain not authorized in Firebase console
+    alert(
+      `Sign-in failed: ${err.message || err.code}\n\n` +
+      `If you're seeing "unauthorized-domain", add your GitHub Pages domain ` +
+      `to Firebase Console → Authentication → Settings → Authorized domains.`
+    );
+  }
+}
+
+async function signOutUser() {
+  try {
+    await signOut(auth);
+    // onAuthStateChanged listener will re-sign-in anonymously
+  } catch (err) {
+    console.error('Sign-out failed:', err);
+  }
+}
 
 
 // ============================================================================
@@ -151,6 +179,8 @@ const I = {
   clock:        (s=16, c) => svgIcon(s, c, html`<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>`),
   trash:        (s=16, c) => svgIcon(s, c, html`<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>`),
   calendar:     (s=16, c) => svgIcon(s, c, html`<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>`),
+  logIn:        (s=16, c) => svgIcon(s, c, html`<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/>`),
+  logOut:       (s=16, c) => svgIcon(s, c, html`<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>`),
 };
 
 function classIcon(klass, size = 14) {
@@ -293,16 +323,31 @@ function StarField() {
 function Root() {
   const [phase, setPhase] = useState('connecting'); // 'connecting' | 'ready' | 'error'
   const [errorMsg, setErrorMsg] = useState(null);
+  const [user, setUser] = useState(null);
 
   useEffect(() => {
-    if (IS_UNCONFIGURED) return; // Root will render the config screen
-    signInAnonymously(auth)
-      .then(() => setPhase('ready'))
-      .catch(err => {
-        console.error('Auth failed:', err);
-        setErrorMsg(err.message || String(err));
-        setPhase('error');
-      });
+    if (IS_UNCONFIGURED) return;
+
+    // onAuthStateChanged fires on initial load, on sign-in (Google or anon),
+    // and on sign-out. When the user signs out, we re-sign-in anonymously so
+    // the calendar stays viewable.
+    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
+        setPhase('ready');
+      } else {
+        try {
+          await signInAnonymously(auth);
+          // Listener will fire again with the new anonymous user.
+        } catch (err) {
+          console.error('Anonymous sign-in failed:', err);
+          setErrorMsg(err.message || String(err));
+          setPhase('error');
+        }
+      }
+    });
+
+    return () => unsub();
   }, []);
 
   let content;
@@ -332,7 +377,7 @@ function Root() {
   } else if (phase === 'connecting') {
     content = html`<div class="ft-root ft-center"><div class="ft-loading">Establishing fireteam link…</div></div>`;
   } else {
-    content = html`<${MainApp} />`;
+    content = html`<${MainApp} user=${user} />`;
   }
 
   return html`
@@ -348,15 +393,20 @@ function Root() {
 //  MainApp — the actual scheduler UI
 // ============================================================================
 
-function MainApp() {
+function MainApp({ user }) {
   const [guardians, setGuardians] = useState({});
   const [availability, setAvailability] = useState({});
   const [raids, setRaids] = useState({});
-  const [myId, setMyId] = useState(() => localStorage.getItem(LS_KEY));
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [hoveredSlot, setHoveredSlot] = useState(null);
   const [modal, setModal] = useState(null);
   const [dataReady, setDataReady] = useState({ g: false, a: false, r: false });
+
+  // Identity is now derived from auth state. A Google-authed user's UID is
+  // their guardian ID — stable across devices. Anonymous users have no
+  // guardian and can only view.
+  const isSignedIn = user && !user.isAnonymous;
+  const myId = isSignedIn ? user.uid : null;
 
   // ---- Real-time subscriptions ----
   useEffect(() => {
@@ -383,22 +433,15 @@ function MainApp() {
   // ---- Actions ----
 
   const createGuardian = async ({ name, klass }) => {
-    const id = randomId();
-    const guardian = { id, name: name.trim(), klass, createdAt: Date.now() };
+    if (!myId) return; // must be signed in with Google
+    const guardian = { id: myId, name: name.trim(), klass, createdAt: Date.now() };
     try {
-      await set(fb.guardianRef(id), guardian);
-      localStorage.setItem(LS_KEY, id);
-      setMyId(id);
+      await set(fb.guardianRef(myId), guardian);
       setModal(null);
     } catch (e) {
       console.error('createGuardian failed', e);
       alert('Could not save guardian. Check your Firebase database rules.');
     }
-  };
-
-  const switchGuardian = (id) => {
-    localStorage.setItem(LS_KEY, id);
-    setMyId(id);
   };
 
   const toggleSlot = async (ds, hour) => {
@@ -499,8 +542,10 @@ function MainApp() {
         <div class="ft-header-right">
           <${GuardianBadge}
             me=${me}
-            guardians=${guardiansList}
-            onSwitch=${switchGuardian}
+            isSignedIn=${isSignedIn}
+            displayName=${user?.displayName}
+            onSignIn=${signInWithGoogle}
+            onSignOut=${signOutUser}
             onCreate=${() => setModal('guardian')}
           />
         </div>
@@ -510,11 +555,19 @@ function MainApp() {
         <div class="ft-cta">
           <div>
             <div class="ft-cta-title">Welcome, Guardian.</div>
-            <div class="ft-cta-sub">Set up your profile to mark availability and join raids.</div>
+            <div class="ft-cta-sub">
+              ${isSignedIn
+                ? 'Set up your profile to mark availability and join raids.'
+                : 'Sign in with Google to create a guardian — your profile syncs across all your devices.'}
+            </div>
           </div>
-          <button class="ft-primary" onClick=${() => setModal('guardian')}>
-            ${I.plus(14)} Create guardian
-          </button>
+          ${isSignedIn
+            ? html`<button class="ft-primary" onClick=${() => setModal('guardian')}>
+                ${I.plus(14)} Set up guardian
+              </button>`
+            : html`<button class="ft-primary" onClick=${signInWithGoogle}>
+                ${I.logIn(14)} Sign in with Google
+              </button>`}
         </div>
       `}
 
@@ -544,6 +597,7 @@ function MainApp() {
           hoveredSlot=${hoveredSlot}
           getSlotGuardians=${getSlotGuardians}
           me=${me}
+          isSignedIn=${isSignedIn}
           total=${guardiansList.length}
         />
       </section>
@@ -603,7 +657,7 @@ function MainApp() {
 function CalendarGrid({ weekDates, me, getSlotGuardians, onToggle, onHover }) {
   const today = new Date();
   return html`
-    <div class="ft-grid-wrap">
+    <div class="ft-grid-wrap" onMouseLeave=${() => onHover(null)}>
       <div class="ft-grid" style=${{ gridTemplateColumns: '64px repeat(7, minmax(80px, 1fr))' }}>
         <div></div>
         ${weekDates.map((d, i) => html`
@@ -668,14 +722,20 @@ function Row({ hour, weekDates, me, getSlotGuardians, onToggle, onHover }) {
   `;
 }
 
-function SlotDetail({ hoveredSlot, getSlotGuardians, me, total }) {
+function SlotDetail({ hoveredSlot, getSlotGuardians, me, isSignedIn, total }) {
   if (!hoveredSlot) {
+    let hintText;
+    if (me) {
+      hintText = "Click on a day to sign up or hover over a day to see other signed up guardians.";
+    } else if (isSignedIn) {
+      hintText = "Set up your guardian to start marking availability.";
+    } else {
+      hintText = "Sign in with Google to start marking availability.";
+    }
     return html`
       <div class="ft-detail ft-detail-hint">
         <span class="ft-detail-icon">›</span>
-        ${me
-          ? 'Hover any time slot to see who\'s available. Click to toggle your own availability.'
-          : 'Create a guardian to start marking your availability.'}
+        ${hintText}
         <span class="ft-detail-spacer"></span>
         <span class="ft-detail-meta">${total} in fireteam · raid ready at ${FIRETEAM_SIZE}</span>
       </div>
@@ -704,15 +764,28 @@ function SlotDetail({ hoveredSlot, getSlotGuardians, me, total }) {
   `;
 }
 
-function GuardianBadge({ me, guardians, onSwitch, onCreate }) {
+function GuardianBadge({ me, isSignedIn, displayName, onSignIn, onSignOut, onCreate }) {
   const [open, setOpen] = useState(false);
-  if (!me) {
+
+  // Not signed in → show Google sign-in button
+  if (!isSignedIn) {
     return html`
-      <button class="ft-primary" onClick=${onCreate}>
-        ${I.plus(14)} Create guardian
+      <button class="ft-primary" onClick=${onSignIn}>
+        ${I.logIn(14)} Sign in with Google
       </button>
     `;
   }
+
+  // Signed in but hasn't set up a guardian yet
+  if (!me) {
+    return html`
+      <button class="ft-primary" onClick=${onCreate}>
+        ${I.plus(14)} Set up guardian
+      </button>
+    `;
+  }
+
+  // Fully set up — badge with dropdown
   return html`
     <div class="ft-badge-wrap">
       <button class="ft-badge" onClick=${() => setOpen(o => !o)}>
@@ -724,22 +797,13 @@ function GuardianBadge({ me, guardians, onSwitch, onCreate }) {
         <${Fragment}>
           <div class="ft-badge-backdrop" onClick=${() => setOpen(false)}></div>
           <div class="ft-badge-menu">
-            <div class="ft-badge-menu-label">Switch guardian</div>
-            ${guardians.map(g => html`
-              <button
-                key=${g.id}
-                class=${`ft-badge-menu-item ${g.id === me.id ? 'ft-active' : ''}`}
-                onClick=${() => { onSwitch(g.id); setOpen(false); }}>
-                ${classIcon(g.klass, 14)}
-                <span>${g.name}</span>
-                ${g.id === me.id && I.check(12)}
-              </button>
-            `)}
-            <div class="ft-badge-menu-sep"></div>
+            ${displayName && html`
+              <div class="ft-badge-menu-label">Signed in as ${displayName}</div>
+            `}
             <button
               class="ft-badge-menu-item"
-              onClick=${() => { onCreate(); setOpen(false); }}>
-              ${I.plus(14)} New guardian
+              onClick=${() => { onSignOut(); setOpen(false); }}>
+              ${I.logOut(14)} Sign out
             </button>
           </div>
         <//>

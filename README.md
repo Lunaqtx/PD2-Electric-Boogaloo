@@ -8,6 +8,11 @@ track who's in.
 Set against an animated star-field with subtle nebula glows. All times in
 **Eastern Time (ET)**.
 
+**Sign in with Google** to create a guardian — your profile then follows you
+across every device you sign in on. Anyone with the link can view the calendar
+without an account; only marking availability and scheduling raids requires
+signing in.
+
 Self-hosted on GitHub Pages with Firebase Realtime Database as the backend.
 Free tier on both is more than enough for a fireteam.
 
@@ -35,16 +40,35 @@ You only do this once. After that, your fireteam just opens the link.
    Analytics — say no when prompted, it isn't needed for this.
 3. Wait for the project to provision (~30 seconds).
 
-### 1.2 Enable Anonymous Authentication
+### 1.2 Enable authentication providers
 
-This is what lets your friends use the app without making accounts.
+The app uses two sign-in methods: **Anonymous** so the calendar loads
+without anyone having to sign in, and **Google** for creating a guardian
+profile that follows you across devices.
 
 1. In the left sidebar, click **Build → Authentication**.
 2. Click **Get started**.
-3. On the **Sign-in method** tab, click **Anonymous** in the list.
-4. Toggle **Enable** on, then **Save**.
+3. On the **Sign-in method** tab, you'll add two providers:
+   - **Anonymous**: click it in the list, toggle **Enable** on, **Save**.
+   - **Google**: click it in the list, toggle **Enable** on. Set the
+     **Project support email** (your own Gmail works), then **Save**.
 
-### 1.3 Create the Realtime Database
+### 1.3 Authorize your GitHub Pages domain
+
+Google sign-in only works from domains Firebase explicitly trusts.
+`localhost` and your Firebase project's `firebaseapp.com` domain are
+allowed by default — you need to add your GitHub Pages domain too.
+
+1. Still in **Authentication**, click the **Settings** tab.
+2. Scroll to **Authorized domains**.
+3. Click **Add domain** and enter your GitHub Pages host, e.g.
+   `yourusername.github.io` (no `https://`, no path — just the host).
+4. Save.
+
+> If you skip this step, the Google popup will close with an error like
+> "auth/unauthorized-domain" and the app will tell you.
+
+### 1.4 Create the Realtime Database
 
 This is where the shared data lives.
 
@@ -70,7 +94,7 @@ This is where the shared data lives.
    notes** section at the bottom.
 7. Click **Publish**.
 
-### 1.4 Get your config snippet
+### 1.5 Get your config snippet
 
 1. In the left sidebar, click the **gear icon** (top-left, next to "Project
    Overview") → **Project settings**.
@@ -130,7 +154,7 @@ Or if you use git locally: clone the repo, copy the files in, commit, push.
 3. Find the block near the top that says **PASTE YOUR FIREBASE CONFIG HERE** —
    roughly lines 25 to 45.
 4. Replace the `firebaseConfig` object's values with the ones from your
-   Firebase project (from step 1.4). It should end up looking like:
+   Firebase project (from step 1.5). It should end up looking like:
    ```js
    const firebaseConfig = {
      apiKey:            "AIzaSy...",
@@ -147,7 +171,7 @@ Or if you use git locally: clone the repo, copy the files in, commit, push.
 
    > Yes, this commits the Firebase config publicly. That's fine — Firebase
    > web config is **not a secret**. The security is enforced by the database
-   > rules you set in step 1.3, not by hiding the config. Google's
+   > rules you set in step 1.4, not by hiding the config. Google's
    > [official docs say so explicitly][1].
 
 ### 2.4 Enable GitHub Pages
@@ -167,12 +191,18 @@ That URL is your private fireteam calendar. Share it with your friends.
 
 ## Part 3 — Test it
 
-1. Open the URL.
-2. Click **Create guardian**, pick a name and class.
-3. Click some time slots — they should fill with gold tint and show a "1".
-4. Open the URL in an **incognito/private window** and create a different
-   guardian. Mark a slot in the same cell — both your guardians should appear
-   instantly in both windows.
+1. Open the URL. You should see the calendar with no guardians yet, and a
+   **Sign in with Google** button in the top-right.
+2. Click **Sign in with Google**, pick a Google account, allow the popup.
+3. The CTA banner should now offer **Set up guardian** — click it, give your
+   guardian a name and pick a class.
+4. Click some time slots — they should fill with gold tint and show a "1".
+5. To test cross-device: sign in on a different browser/device with the
+   **same Google account** — your guardian and availability should be
+   identical, no setup needed.
+6. To test multi-user: sign in on another browser with a **different Google
+   account** and create a second guardian. Both should show up in the same
+   calendar in real-time.
 
 If that works, you're done. Send the link to your fireteam.
 
@@ -253,11 +283,21 @@ Three common causes:
 
 **App loads but slots don't save**
 Open browser DevTools → Console. If you see `PERMISSION_DENIED`, your
-database rules are blocking writes. Re-check step 1.3.
+database rules are blocking writes. Re-check step 1.4.
 
 **Friends see "Could not connect"**
 They need to have anonymous auth allowed (which is automatic once you've
 enabled it in step 1.2). If still broken, ask them to share the console error.
+
+**Google sign-in popup closes immediately or shows "unauthorized-domain"**
+Your GitHub Pages domain isn't in Firebase's authorized domain list.
+Go to **Firebase Console → Authentication → Settings → Authorized domains**
+and add `yourusername.github.io` (the host only, no path). See step 1.3.
+
+**Friend signs in with Google but ends up with a blank guardian**
+That's normal — they're signed in, but they haven't set up their guardian's
+name and class yet. They should see a **Set up guardian** button in the
+top-right or in the welcome banner.
 
 **Past raids cluttering the list**
 Click the trash icon on any raid card to delete it. Past raids appear at the
