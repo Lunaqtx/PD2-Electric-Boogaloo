@@ -105,17 +105,20 @@ const CLASSES = {
 };
 
 const RAIDS = [
-  "Salvation's Edge",
-  "Crota's End",
-  "Root of Nightmares",
-  "King's Fall",
-  "Vow of the Disciple",
-  "Vault of Glass",
-  "Deep Stone Crypt",
-  "Garden of Salvation",
+  "Leviathan",
+  "Eater of Worlds",
+  "Spire of Stars",
   "Last Wish",
-  "Dungeon",
-  "Other",
+  "Scourge of the Past",
+  "Crown of Sorrow",
+  "Garden of Salvation",
+  "Deep Stone Crypt",
+  "Vault of Glass",
+  "Vow of the Disciple",
+  "King's Fall",
+  "Root of Nightmares",
+  "Croata's End",
+  "Salvation's Edge",
 ];
 
 const FIRETEAM_SIZE = 6;
