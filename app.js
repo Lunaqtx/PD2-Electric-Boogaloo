@@ -117,7 +117,7 @@ const RAIDS = [
   "Vow of the Disciple",
   "King's Fall",
   "Root of Nightmares",
-  "Croata's End",
+  "Crota's End",
   "Salvation's Edge",
 ];
 
@@ -235,6 +235,58 @@ const fb = {
 
 
 // ============================================================================
+//  Starfield — generated once per session, animated via CSS classes in style.css
+// ============================================================================
+
+function generateStars(count, w, h) {
+  const tints = ['s', 's', 's', 's', 's', 's', 's', 's', 's-blue', 's-warm', 's-rose', 's-violet', 's-cyan'];
+  const animProfiles = ['tw-d1', 'tw-d2', 'tw-d3', 'tw-m1', 'tw-m2', 'tw-m3', 'tw-m4'];
+  const brightProfiles = ['tw-b1', 'tw-b2'];
+  const staticProfiles = ['st-d', 'st-m'];
+
+  const stars = [];
+  for (let i = 0; i < count; i++) {
+    const isBright = Math.random() < 0.06;                       // ~6% bright accents
+    const isStatic = !isBright && Math.random() < 0.15;          // ~15% of dim/medium stay constant
+    let r, profileCls;
+    if (isBright) {
+      r = 0.8;
+      profileCls = 'tw ' + brightProfiles[Math.floor(Math.random() * brightProfiles.length)];
+    } else if (isStatic) {
+      r = 0.35 + Math.random() * 0.15;
+      profileCls = staticProfiles[Math.floor(Math.random() * staticProfiles.length)];
+    } else {
+      r = 0.35 + Math.random() * 0.2;
+      profileCls = 'tw ' + animProfiles[Math.floor(Math.random() * animProfiles.length)];
+    }
+    const tint = tints[Math.floor(Math.random() * tints.length)];
+    stars.push({
+      cx: Math.round(Math.random() * w),
+      cy: Math.round(Math.random() * h),
+      r:  r.toFixed(2),
+      cls: tint + ' ' + profileCls,
+    });
+  }
+  return stars;
+}
+
+// 280 stars in a 1200x800 viewBox; preserveAspectRatio="xMidYMid slice" makes it
+// fill any viewport, cropping uniformly. Density approximates the approved preview
+// when rendered at common desktop sizes (1920x1080 / 1440x900).
+const STARS = generateStars(280, 1200, 800);
+
+function StarField() {
+  return html`
+    <svg class="ft-stars" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      ${STARS.map((s, i) => html`
+        <circle key=${i} cx=${s.cx} cy=${s.cy} r=${s.r} class=${s.cls}/>
+      `)}
+    </svg>
+  `;
+}
+
+
+// ============================================================================
 //  Root — handles auth state and config errors
 // ============================================================================
 
@@ -253,8 +305,9 @@ function Root() {
       });
   }, []);
 
+  let content;
   if (IS_UNCONFIGURED) {
-    return html`
+    content = html`
       <div class="ft-root">
         <div class="ft-error">
           <h2>Firebase config required</h2>
@@ -264,10 +317,8 @@ function Root() {
         </div>
       </div>
     `;
-  }
-
-  if (phase === 'error') {
-    return html`
+  } else if (phase === 'error') {
+    content = html`
       <div class="ft-root">
         <div class="ft-error">
           <h2>Could not connect</h2>
@@ -278,13 +329,18 @@ function Root() {
         </div>
       </div>
     `;
+  } else if (phase === 'connecting') {
+    content = html`<div class="ft-root ft-center"><div class="ft-loading">Establishing fireteam link…</div></div>`;
+  } else {
+    content = html`<${MainApp} />`;
   }
 
-  if (phase === 'connecting') {
-    return html`<div class="ft-root ft-center"><div class="ft-loading">Establishing fireteam link…</div></div>`;
-  }
-
-  return html`<${MainApp} />`;
+  return html`
+    <${Fragment}>
+      <${StarField} />
+      ${content}
+    <//>
+  `;
 }
 
 
@@ -433,11 +489,8 @@ function MainApp() {
   return html`
     <div class="ft-root">
       <header class="ft-header">
-        <div class="ft-title-block">
-          <div class="ft-eyebrow">
-            <span class="ft-sync-dot" title="Live sync active"></span>
-            Fireteam scheduler · ${guardiansList.length} guardian${guardiansList.length === 1 ? '' : 's'} · Eastern Time
-          </div>
+        <div class="ft-title-row">
+          <span class="ft-sync-dot" title="Live sync active"></span>
           <h1 class="ft-title">
             <span class="ft-title-main">Project Destiny 2</span>${' '}
             <span class="ft-title-sub">Electric Boogaloo</span>
@@ -467,10 +520,7 @@ function MainApp() {
 
       <section class="ft-section">
         <div class="ft-section-head">
-          <div>
-            <div class="ft-eyebrow">Availability · all times ET</div>
-            <div class="ft-section-title">${formatRange(weekStart)}</div>
-          </div>
+          <div class="ft-section-title">${formatRange(weekStart)}</div>
           <div class="ft-week-nav">
             <button class="ft-icon-btn" onClick=${() => setWeekStart(addDays(weekStart, -7))} title="Previous week">
               ${I.chevronLeft(16)}
@@ -603,7 +653,6 @@ function Row({ hour, weekDates, me, getSlotGuardians, onToggle, onHover }) {
             style=${{ background: bg }}
             onClick=${() => me && onToggle(ds, hour)}
             onMouseEnter=${() => onHover({ ds, hour, date: d })}
-            onMouseLeave=${() => onHover(null)}
             disabled=${!me}>
             <div class="ft-cell-count">${count > 0 ? count : ''}</div>
             <div class="ft-cell-dots">

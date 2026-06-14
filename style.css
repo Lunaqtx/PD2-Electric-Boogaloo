@@ -26,7 +26,57 @@ body {
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
   font-feature-settings: "cv11", "ss03";
+  min-height: 100vh;
+  overflow-x: hidden;
 }
+
+/* Fixed nebula glow layer — sits behind everything */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% -10%, #1A1F2E 0%, transparent 60%),
+    radial-gradient(ellipse 1200px 800px at 10% 75%, rgba(155, 107, 216, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 1000px 700px at 90% 25%, rgba(75, 180, 216, 0.11) 0%, transparent 60%),
+    radial-gradient(ellipse 800px 600px at 65% 90%, rgba(198, 146, 73, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Animated starfield — rendered by Preact, sits above gradient, below content */
+.ft-stars {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+.ft-stars .s        { fill: #FFFFFF; }
+.ft-stars .s-blue   { fill: #DCE7FF; }
+.ft-stars .s-warm   { fill: #FFEFCF; }
+.ft-stars .s-rose   { fill: #FFE0E8; }
+.ft-stars .s-violet { fill: #E8DCFF; }
+.ft-stars .s-cyan   { fill: #DCFCFF; }
+.ft-stars .tw {
+  animation: ft-twinkle var(--dur, 5s) ease-in-out var(--delay, 0s) infinite;
+}
+@keyframes ft-twinkle {
+  0%, 100% { opacity: var(--max, 0.7); }
+  50%      { opacity: var(--min, 0.2); }
+}
+.ft-stars .tw-d1 { --max:.35; --min:.10; --dur:3.5s; --delay:-0.4s; }
+.ft-stars .tw-d2 { --max:.35; --min:.10; --dur:5s;   --delay:-2.5s; }
+.ft-stars .tw-d3 { --max:.40; --min:.15; --dur:3s;   --delay:-1.8s; }
+.ft-stars .tw-m1 { --max:.60; --min:.20; --dur:4.5s; --delay:0s;    }
+.ft-stars .tw-m2 { --max:.65; --min:.25; --dur:5.5s; --delay:-3s;   }
+.ft-stars .tw-m3 { --max:.55; --min:.20; --dur:3s;   --delay:-2s;   }
+.ft-stars .tw-m4 { --max:.65; --min:.30; --dur:5s;   --delay:-1.2s; }
+.ft-stars .tw-b1 { --max:.85; --min:.40; --dur:4.5s; --delay:-1.5s; }
+.ft-stars .tw-b2 { --max:.90; --min:.50; --dur:6s;   --delay:-3.5s; }
+.ft-stars .st-d { opacity: 0.28; }
+.ft-stars .st-m { opacity: 0.55; }
 
 .ft-bootstrap {
   min-height: 100vh;
@@ -41,7 +91,8 @@ body {
 }
 
 .ft-root {
-  background: radial-gradient(ellipse at 50% -10%, #1A1F2E 0%, var(--bg) 60%);
+  position: relative;
+  z-index: 1;
   color: var(--cream);
   font-family: var(--font);
   min-height: 100vh;
@@ -85,12 +136,18 @@ body {
 /* ---- header ---- */
 .ft-header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   padding-bottom: 28px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 36px;
+}
+.ft-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 .ft-header-right { display: flex; gap: 10px; align-items: center; }
 .ft-eyebrow {
@@ -387,6 +444,7 @@ body {
   flex-wrap: wrap;
   font-size: 13px;
   min-height: 48px;
+  transition: border-left-color 0.25s ease, background 0.25s ease;
 }
 .ft-detail-ready {
   border-left-color: var(--ready);
@@ -658,13 +716,11 @@ textarea.ft-input { resize: vertical; line-height: 1.5; }
 @keyframes ft-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .ft-sync-dot {
-  display: inline-block;
-  width: 8px; height: 8px;
+  width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--gold-bright);
-  box-shadow: 0 0 8px var(--gold);
-  margin-right: 6px;
-  vertical-align: middle;
+  box-shadow: 0 0 10px var(--gold);
+  flex-shrink: 0;
   animation: ft-pulse 2.4s ease-in-out infinite;
 }
 @keyframes ft-pulse {
