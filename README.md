@@ -209,6 +209,35 @@ Hard-refresh (Ctrl+Shift+R / Cmd+Shift+R) to bypass browser caching.
 
 ---
 
+## Pushing updates without making everyone hard-refresh
+
+Browsers cache `style.css` and `app.js` aggressively. GitHub Pages tells
+browsers they're good for 10 minutes, so even after you push a change, your
+fireteam may still see the old version for up to that long — and longer if
+their browser is holding on tighter.
+
+To force everyone to fetch a fresh copy the next time they load the page,
+**bump the asset version in `index.html`**:
+
+```html
+<link rel="stylesheet" href="./style.css?v=2" />
+...
+<script type="module" src="./app.js?v=2"></script>
+```
+
+Increment the `?v=N` number whenever you push CSS or JS changes that need to
+propagate immediately. Browsers cache by full URL, so `style.css?v=3` is a
+different resource from `style.css?v=2` — they have no choice but to refetch.
+
+You only need to do this when the change is something visible/breaking. For
+small tweaks, GitHub Pages' default cache will expire on its own within ~10
+minutes and everyone will pick up the new version next time they open the page.
+
+If you forget to bump and someone reports stale UI, they can always hard-refresh
+(Ctrl+Shift+R / Cmd+Shift+R) as a one-off fix.
+
+---
+
 ## Troubleshooting
 
 **"Firebase config required" screen**
