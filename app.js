@@ -3,7 +3,7 @@
 //  Fireteam availability calendar — runs on GitHub Pages + Firebase
 // ============================================================================
 
-import { h, render } from 'https://esm.sh/preact@10.22.0';
+import { h, render, Fragment } from 'https://esm.sh/preact@10.22.0';
 import {
   useState, useEffect, useCallback, useMemo, useRef
 } from 'https://esm.sh/preact@10.22.0/hooks';
@@ -47,13 +47,46 @@ const firebaseConfig = {
 
 
 const html = htm.bind(h);
-const IS_UNCONFIGURED = firebaseConfig.apiKey.startsWith('REPLACE_');
+const IS_UNCONFIGURED = !firebaseConfig
+  || !firebaseConfig.apiKey
+  || typeof firebaseConfig.apiKey !== 'string'
+  || firebaseConfig.apiKey.startsWith('REPLACE_');
+
+// Surface any uncaught error directly on the page so non-dev users see it.
+function showFatalError(label, detail) {
+  const el = document.getElementById('app');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="max-width:600px;margin:60px auto;padding:24px;
+                background:#11151E;border:1px solid #D6493E;
+                border-left:2px solid #D6493E;color:#ECE7D9;
+                font-family:Inter,system-ui,sans-serif;">
+      <h2 style="margin:0 0 12px;color:#D6493E;font-size:18px;">${label}</h2>
+      <pre style="margin:0;padding:12px;background:#0A0D14;color:#E8B968;
+                  font-size:12px;white-space:pre-wrap;word-break:break-word;
+                  font-family:ui-monospace,monospace;">${
+        String(detail).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))
+      }</pre>
+    </div>`;
+}
+
+window.addEventListener('error', (e) => {
+  showFatalError('JavaScript error', e.error?.stack || e.message || String(e));
+});
+window.addEventListener('unhandledrejection', (e) => {
+  showFatalError('Async error', e.reason?.stack || e.reason?.message || String(e.reason));
+});
 
 let firebaseApp, db, auth;
 if (!IS_UNCONFIGURED) {
-  firebaseApp = initializeApp(firebaseConfig);
-  db = getDatabase(firebaseApp);
-  auth = getAuth(firebaseApp);
+  try {
+    firebaseApp = initializeApp(firebaseConfig);
+    db = getDatabase(firebaseApp);
+    auth = getAuth(firebaseApp);
+  } catch (e) {
+    showFatalError('Firebase init failed', e.stack || e.message || String(e));
+    throw e;
+  }
 }
 
 
@@ -544,7 +577,7 @@ function CalendarGrid({ weekDates, me, getSlotGuardians, onToggle, onHover }) {
 
 function Row({ hour, weekDates, me, getSlotGuardians, onToggle, onHover }) {
   return html`
-    <>
+    <${Fragment}>
       <div class="ft-grid-hour">${formatHour(hour)}</div>
       ${weekDates.map(d => {
         const ds = dateString(d);
@@ -579,7 +612,7 @@ function Row({ hour, weekDates, me, getSlotGuardians, onToggle, onHover }) {
           </button>
         `;
       })}
-    </>
+    <//>
   `;
 }
 
@@ -636,7 +669,7 @@ function GuardianBadge({ me, guardians, onSwitch, onCreate }) {
         <span class="ft-badge-class">${CLASSES[me.klass]?.name}</span>
       </button>
       ${open && html`
-        <>
+        <${Fragment}>
           <div class="ft-badge-backdrop" onClick=${() => setOpen(false)}></div>
           <div class="ft-badge-menu">
             <div class="ft-badge-menu-label">Switch guardian</div>
@@ -657,7 +690,7 @@ function GuardianBadge({ me, guardians, onSwitch, onCreate }) {
               ${I.plus(14)} New guardian
             </button>
           </div>
-        </>
+        <//>
       `}
     </div>
   `;
